@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, requestUrl, Menu, Editor, MarkdownView, Component } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, requestUrl, Menu, Editor, MarkdownView, Component, Modal } from 'obsidian';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -287,29 +287,181 @@ export default class CrossVaultPlugin extends Plugin {
 	}
 }
 
-class VaultMappingModal extends Component {
+class VaultMappingModal extends Modal {
 	plugin: CrossVaultPlugin;
 	parsedUrl: ObsidianUrl;
-	modal: any;
+	nameInput!: HTMLInputElement;
+	pathInput!: HTMLInputElement;
+	cacheCheckbox!: HTMLInputElement;
 
 	constructor(app: App, plugin: CrossVaultPlugin, parsedUrl: ObsidianUrl) {
-		super();
+		super(app);
 		this.plugin = plugin;
 		this.parsedUrl = parsedUrl;
 	}
 
-	open() {
-		// Simple prompt for now - in a real implementation, you'd create a proper modal
-		const vaultPath = prompt(`Enter the path for vault "${this.parsedUrl.vault}":`);
-		if (vaultPath) {
-			const mapping: VaultMapping = {
-				name: this.parsedUrl.vault,
-				path: vaultPath,
-				enableLocalCache: false
-			};
-			this.plugin.addVaultMapping(mapping);
-			new Notice(`Vault "${this.parsedUrl.vault}" mapped successfully`);
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		
+		contentEl.createEl('h2', { text: 'Map Vault' });
+		
+		// Vault Name
+		contentEl.createEl('label', { text: 'Vault Name:' });
+		this.nameInput = contentEl.createEl('input', { type: 'text', value: this.parsedUrl.vault });
+		this.nameInput.style.width = '100%';
+		this.nameInput.style.marginBottom = '10px';
+		
+		// Vault Path
+		contentEl.createEl('label', { text: 'Vault Path:' });
+		this.pathInput = contentEl.createEl('input', { type: 'text', placeholder: 'Enter the full path to the vault directory' });
+		this.pathInput.style.width = '100%';
+		this.pathInput.style.marginBottom = '10px';
+		
+		// Local Cache Option
+		const cacheContainer = contentEl.createDiv();
+		cacheContainer.style.marginBottom = '20px';
+		this.cacheCheckbox = cacheContainer.createEl('input', { type: 'checkbox' });
+		cacheContainer.createEl('label', { text: ' Enable Local Cache' });
+		cacheContainer.prepend(this.cacheCheckbox);
+		
+		// Buttons
+		const buttonContainer = contentEl.createDiv();
+		buttonContainer.style.display = 'flex';
+		buttonContainer.style.justifyContent = 'space-between';
+		buttonContainer.style.marginTop = '20px';
+		
+		const saveButton = buttonContainer.createEl('button', { text: 'Save' });
+		saveButton.style.backgroundColor = 'var(--interactive-accent)';
+		saveButton.style.color = 'var(--text-on-accent)';
+		saveButton.addEventListener('click', () => this.save());
+		
+		const cancelButton = buttonContainer.createEl('button', { text: 'Cancel' });
+		cancelButton.addEventListener('click', () => this.close());
+		
+		// Focus on path input
+		this.pathInput.focus();
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+
+	save() {
+		const name = this.nameInput.value.trim();
+		const path = this.pathInput.value.trim();
+		
+		if (!name || !path) {
+			new Notice('Please enter both vault name and path');
+			return;
 		}
+		
+		const mapping: VaultMapping = {
+			name,
+			path,
+			enableLocalCache: this.cacheCheckbox.checked
+		};
+		
+		this.plugin.addVaultMapping(mapping);
+		new Notice(`Vault "${name}" mapped successfully`);
+		this.close();
+	}
+}
+
+class AddVaultModal extends Modal {
+	plugin: CrossVaultPlugin;
+	callback: () => void;
+	nameInput!: HTMLInputElement;
+	pathInput!: HTMLInputElement;
+	cacheCheckbox!: HTMLInputElement;
+
+	constructor(app: App, plugin: CrossVaultPlugin, callback: () => void) {
+		super(app);
+		this.plugin = plugin;
+		this.callback = callback;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		
+		contentEl.createEl('h2', { text: 'Add New Vault' });
+		
+		// Vault Name
+		contentEl.createEl('label', { text: 'Vault Name:' });
+		this.nameInput = contentEl.createEl('input', { type: 'text', placeholder: 'Enter vault name' });
+		this.nameInput.style.width = '100%';
+		this.nameInput.style.marginBottom = '10px';
+		
+		// Vault Path
+		contentEl.createEl('label', { text: 'Vault Path:' });
+		this.pathInput = contentEl.createEl('input', { type: 'text', placeholder: 'Enter the full path to the vault directory' });
+		this.pathInput.style.width = '100%';
+		this.pathInput.style.marginBottom = '10px';
+		
+		// Local Cache Option
+		const cacheContainer = contentEl.createDiv();
+		cacheContainer.style.marginBottom = '20px';
+		this.cacheCheckbox = cacheContainer.createEl('input', { type: 'checkbox' });
+		cacheContainer.createEl('label', { text: ' Enable Local Cache' });
+		cacheContainer.prepend(this.cacheCheckbox);
+		
+		// Buttons
+		const buttonContainer = contentEl.createDiv();
+		buttonContainer.style.display = 'flex';
+		buttonContainer.style.justifyContent = 'space-between';
+		buttonContainer.style.marginTop = '20px';
+		
+		const saveButton = buttonContainer.createEl('button', { text: 'Add Vault' });
+		saveButton.style.backgroundColor = 'var(--interactive-accent)';
+		saveButton.style.color = 'var(--text-on-accent)';
+		saveButton.addEventListener('click', () => this.save());
+		
+		const cancelButton = buttonContainer.createEl('button', { text: 'Cancel' });
+		cancelButton.addEventListener('click', () => this.close());
+		
+		// Focus on name input
+		this.nameInput.focus();
+		
+		// Handle Enter key
+		this.nameInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				this.pathInput.focus();
+			}
+		});
+		
+		this.pathInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				this.save();
+			}
+		});
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+
+	save() {
+		const name = this.nameInput.value.trim();
+		const path = this.pathInput.value.trim();
+		
+		if (!name || !path) {
+			new Notice('Please enter both vault name and path');
+			return;
+		}
+		
+		const mapping: VaultMapping = {
+			name,
+			path,
+			enableLocalCache: this.cacheCheckbox.checked
+		};
+		
+		this.plugin.addVaultMapping(mapping);
+		new Notice(`Vault "${name}" added successfully`);
+		this.callback(); // Refresh the settings display
+		this.close();
 	}
 }
 
@@ -390,20 +542,9 @@ class CrossVaultSettingTab extends PluginSettingTab {
 	}
 
 	private showAddVaultDialog() {
-		const name = prompt('Enter vault name:');
-		if (!name) return;
-		
-		const path = prompt('Enter vault path:');
-		if (!path) return;
-		
-		const mapping: VaultMapping = {
-			name,
-			path,
-			enableLocalCache: false
-		};
-		
-		this.plugin.addVaultMapping(mapping);
-		this.display(); // Refresh the display
-		new Notice(`Vault "${name}" added successfully`);
+		const modal = new AddVaultModal(this.app, this.plugin, () => {
+			this.display(); // Refresh the display after adding vault
+		});
+		modal.open();
 	}
 } 
