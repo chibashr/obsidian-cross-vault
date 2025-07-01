@@ -115,6 +115,11 @@ export default class CrossVaultPlugin extends Plugin {
 	}
 
 	private enhanceObsidianLink(linkElement: HTMLAnchorElement, parsedUrl: ObsidianUrl, vaultMapping: VaultMapping, fileContent: string) {
+		// Update link text and style
+		linkElement.textContent = `${parsedUrl.vault}/${parsedUrl.file}`;
+		linkElement.className = 'cross-vault-link';
+		linkElement.title = `Click to open in ${vaultMapping.name} vault`;
+
 		// Add status indicator
 		const statusSpan = document.createElement('span');
 		statusSpan.className = 'cross-vault-status';
@@ -156,17 +161,26 @@ export default class CrossVaultPlugin extends Plugin {
 	private showPreview(element: HTMLElement, content: string, fileName: string) {
 		const preview = document.createElement('div');
 		preview.className = 'cross-vault-preview';
+
+		// Get first heading if exists
+		const headingMatch = content.match(/^#\s+(.+)$/m);
+		const heading = headingMatch ? headingMatch[1] : fileName;
+
+		// Get first paragraph
+		const paragraphMatch = content.match(/\n\n(.+?)\n\n/);
+		const excerpt = paragraphMatch 
+			? paragraphMatch[1].substring(0, 200) 
+			: content.substring(0, 200);
+
 		preview.innerHTML = `
-			<strong>${fileName}</strong><br>
-			${content.substring(0, 200)}${content.length > 200 ? '...' : ''}
+			<strong>${heading}</strong>
+			${excerpt}${content.length > 200 ? '...' : ''}
 		`;
 		
 		const rect = element.getBoundingClientRect();
 		preview.style.position = 'absolute';
 		preview.style.top = `${rect.bottom + 5}px`;
 		preview.style.left = `${rect.left}px`;
-		preview.style.zIndex = '1000';
-		preview.style.maxWidth = '300px';
 		
 		document.body.appendChild(preview);
 		
