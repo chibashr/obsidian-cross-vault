@@ -72,4 +72,22 @@
 
 .browse-button:hover {
     background-color: var(--interactive-accent-hover);
+}
+
+.cross-vault-widget {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    cursor: pointer;
+    color: var(--text-accent);
+}
+
+.cross-vault-widget.cross-vault-error {
+    color: var(--text-error);
+}
+
+.cross-vault-widget:hover {
+    background-color: var(--background-modifier-hover);
 } 

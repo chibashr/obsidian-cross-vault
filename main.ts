@@ -1,4 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, requestUrl, Menu, Editor, MarkdownView, Component, Modal } from 'obsidian';
+import { EditorView, ViewPlugin, ViewUpdate, DecorationSet, Decoration } from '@codemirror/view';
+import { WidgetType } from '@codemirror/view';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -50,8 +52,13 @@ export default class CrossVaultPlugin extends Plugin {
 			})
 		);
 
-		// Register markdown processor for obsidian:// links
+		// Register markdown processor for obsidian:// links in preview mode
 		this.registerMarkdownProcessor();
+
+		// Register editor extension for live preview
+		this.registerEditorExtension([
+			this.editorLivePreviewExtension()
+		]);
 
 		// Register command to refresh cross-vault links
 		this.addCommand({
@@ -266,10 +273,55 @@ export default class CrossVaultPlugin extends Plugin {
 		modal.open();
 	}
 
+	private editorLivePreviewExtension() {
+		return ViewPlugin.fromClass(class {
+			decorations: DecorationSet;
+			plugin: CrossVaultPlugin;
+
+			constructor(view: EditorView) {
+				this.plugin = (window as any).app.plugins.plugins['obsidian-cross-vault'] as CrossVaultPlugin;
+				this.decorations = this.buildDecorations(view);
+			}
+
+			update(update: ViewUpdate) {
+				if (update.docChanged || update.viewportChanged) {
+					this.decorations = this.buildDecorations(update.view);
+				}
+			}
+
+			buildDecorations(view: EditorView) {
+				const widgets = [];
+				const content = view.state.doc.toString();
+				const urlRegex = /obsidian:\/\/open\?[^\s)]+/g;
+				let match;
+
+				while ((match = urlRegex.exec(content)) !== null) {
+					const parsedUrl = this.plugin.parseObsidianUrl(match[0]);
+					if (!parsedUrl) continue;
+
+					const vaultMapping = this.plugin.getVaultMapping(parsedUrl.vault);
+					const from = match.index;
+					const to = from + match[0].length;
+
+					widgets.push(Decoration.widget({
+						widget: new CrossVaultLinkWidget(this.plugin, parsedUrl, vaultMapping),
+						side: 1
+					}).range(to));
+				}
+
+				return Decoration.set(widgets);
+			}
+		}, {
+			decorations: (v: any) => v.decorations
+		});
+	}
+
 	private refreshCurrentNote() {
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (activeView) {
-			activeView.previewMode.rerender(true);
+			if (activeView.previewMode) {
+				activeView.previewMode.rerender(true);
+			}
 			new Notice('Cross-vault links refreshed');
 		}
 	}
@@ -394,11 +446,32 @@ class AddVaultModal extends Modal {
 		this.nameInput.style.width = '100%';
 		this.nameInput.style.marginBottom = '10px';
 		
-		// Vault Path
+		// Vault Path with Browse Button
 		contentEl.createEl('label', { text: 'Vault Path:' });
-		this.pathInput = contentEl.createEl('input', { type: 'text', placeholder: 'Enter the full path to the vault directory' });
-		this.pathInput.style.width = '100%';
-		this.pathInput.style.marginBottom = '10px';
+		const pathContainer = contentEl.createDiv();
+		pathContainer.style.display = 'flex';
+		pathContainer.style.gap = '10px';
+		pathContainer.style.marginBottom = '10px';
+
+		this.pathInput = pathContainer.createEl('input', { type: 'text', placeholder: 'Enter the full path to the vault directory' });
+		this.pathInput.style.flex = '1';
+
+		const browseButton = pathContainer.createEl('button', { text: 'Browse', cls: 'browse-button' });
+		browseButton.addEventListener('click', async () => {
+			try {
+				// @ts-ignore - showOpenDialog is available but not typed
+				const result = await window.electron.remote.dialog.showOpenDialog({
+					properties: ['openDirectory']
+				});
+				
+				if (!result.canceled && result.filePaths.length > 0) {
+					this.pathInput.value = result.filePaths[0];
+				}
+			} catch (error) {
+				console.error('Error opening file dialog:', error);
+				new Notice('Could not open file browser. Please enter path manually.');
+			}
+		});
 		
 		// Local Cache Option
 		const cacheContainer = contentEl.createDiv();
@@ -465,6 +538,38 @@ class AddVaultModal extends Modal {
 	}
 }
 
+class CrossVaultLinkWidget extends WidgetType {
+	plugin: CrossVaultPlugin;
+	parsedUrl: ObsidianUrl;
+	vaultMapping: VaultMapping | null;
+
+	constructor(plugin: CrossVaultPlugin, parsedUrl: ObsidianUrl, vaultMapping: VaultMapping | null) {
+		super();
+		this.plugin = plugin;
+		this.parsedUrl = parsedUrl;
+		this.vaultMapping = vaultMapping;
+	}
+
+	toDOM() {
+		const span = document.createElement('span');
+		span.className = 'cross-vault-widget';
+
+		if (!this.vaultMapping) {
+			span.className += ' cross-vault-error';
+			span.textContent = '?';
+			span.title = `Vault "${this.parsedUrl.vault}" not mapped. Click to map.`;
+			span.addEventListener('click', () => {
+				(this.plugin as any).showVaultMappingDialog(this.parsedUrl);
+			});
+		} else {
+			span.textContent = '✓';
+			span.title = `Linked to: ${this.vaultMapping.path}`;
+		}
+
+		return span;
+	}
+}
+
 class CrossVaultSettingTab extends PluginSettingTab {
 	plugin: CrossVaultPlugin;
 
@@ -518,9 +623,22 @@ class CrossVaultSettingTab extends PluginSettingTab {
 			});
 			
 			const browseButton = mappingDiv.createEl('button', { text: 'Browse', cls: 'browse-button' });
-			browseButton.addEventListener('click', () => {
-				// Note: File browsing would require additional implementation
-				new Notice('File browsing not implemented in this demo. Please enter path manually.');
+			browseButton.addEventListener('click', async () => {
+				try {
+					// @ts-ignore - showOpenDialog is available but not typed
+					const result = await window.electron.remote.dialog.showOpenDialog({
+						properties: ['openDirectory']
+					});
+					
+					if (!result.canceled && result.filePaths.length > 0) {
+						pathInput.value = result.filePaths[0];
+						mapping.path = result.filePaths[0];
+						this.plugin.saveSettings();
+					}
+				} catch (error) {
+					console.error('Error opening file dialog:', error);
+					new Notice('Could not open file browser. Please enter path manually.');
+				}
 			});
 			
 			const cacheCheckbox = mappingDiv.createEl('input', { type: 'checkbox' });
