@@ -1,0 +1,84 @@
+/* Cross Vault Plugin Styles */
+
+/* Mapped cross-vault links - green indicator */
+.cross-vault-mapped {
+    color: var(--text-accent) !important;
+    border-bottom: 1px dotted var(--text-accent);
+    position: relative;
+}
+
+.cross-vault-mapped::before {
+    content: "🔗";
+    font-size: 0.8em;
+    margin-right: 2px;
+    opacity: 0.7;
+}
+
+.cross-vault-mapped:hover {
+    background-color: var(--background-modifier-hover);
+    border-radius: 3px;
+    padding: 1px 2px;
+}
+
+/* Unmapped cross-vault links - orange indicator */
+.cross-vault-unmapped {
+    color: var(--text-warning) !important;
+    border-bottom: 1px dashed var(--text-warning);
+    position: relative;
+}
+
+.cross-vault-unmapped::before {
+    content: "⚠️";
+    font-size: 0.8em;
+    margin-right: 2px;
+    opacity: 0.7;
+}
+
+.cross-vault-unmapped:hover {
+    background-color: var(--background-modifier-error);
+    border-radius: 3px;
+    padding: 1px 2px;
+    cursor: pointer;
+}
+
+/* Missing cross-vault links - red indicator */
+.cross-vault-missing {
+    color: var(--text-error) !important;
+    border-bottom: 1px solid var(--text-error);
+    position: relative;
+    text-decoration: line-through;
+}
+
+.cross-vault-missing::before {
+    content: "❌";
+    font-size: 0.8em;
+    margin-right: 2px;
+    opacity: 0.7;
+}
+
+/* Settings page styles */
+.cross-vault-settings {
+    padding: 20px;
+}
+
+.cross-vault-settings h2 {
+    color: var(--text-normal);
+    margin-bottom: 20px;
+}
+
+.cross-vault-settings h3 {
+    color: var(--text-muted);
+    margin-top: 30px;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+}
+
+/* Modal styles */
+.cross-vault-modal .modal-content {
+    max-width: 500px;
+}
+
+.cross-vault-modal .setting-item-description {
+    color: var(--text-muted);
+    font-size: 0.9em;
+} 

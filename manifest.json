@@ -1,0 +1,11 @@
+{
+	"id": "obsidian-cross-vault",
+	"name": "Cross Vault Linker",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Link and preview pages across different Obsidian vaults stored locally or relatively.",
+	"author": "chibashr",
+	"authorUrl": "https://github.com/chibashr",
+	"fundingUrl": "https://github.com/chibashr/obsidian-cross-vault",
+	"isDesktopOnly": true
+} 
