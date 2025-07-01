@@ -1,5 +1,12 @@
 /* Cross Vault Plugin Styles */
 
+/* Base styles for all cross-vault links */
+a[href^="obsidian://"] {
+    color: var(--link-color) !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+}
+
 /* Mapped cross-vault links - green indicator */
 .cross-vault-mapped {
     color: var(--text-accent) !important;

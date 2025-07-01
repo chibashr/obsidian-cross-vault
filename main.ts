@@ -207,7 +207,7 @@ export default class CrossVaultPlugin extends Plugin {
 		
 		if (!vaultPath) {
 			// Show unmapped vault indicator
-			link.addClass('cross-vault-unmapped');
+			link.classList.add('cross-vault-unmapped');
 			link.title = `Vault "${vault}" not mapped. Click to map.`;
 			link.addEventListener('click', (e) => {
 				e.preventDefault();
@@ -221,7 +221,7 @@ export default class CrossVaultPlugin extends Plugin {
 		const resolvedFile = await this.resolveFile(vault, file, vaultPath);
 		
 		if (resolvedFile) {
-			link.addClass('cross-vault-mapped');
+			link.classList.add('cross-vault-mapped');
 			link.title = `Cross-vault link: ${vault}/${file}`;
 			
 			// Add hover preview
@@ -234,7 +234,7 @@ export default class CrossVaultPlugin extends Plugin {
 				this.openCrossVaultFile(resolvedFile);
 			});
 		} else {
-			link.addClass('cross-vault-missing');
+			link.classList.add('cross-vault-missing');
 			link.title = `File not found: ${vault}/${file}`;
 		}
 	}
