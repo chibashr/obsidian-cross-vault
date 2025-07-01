@@ -6,12 +6,12 @@
 		"module": "ESNext",
 		"target": "ES6",
 		"allowJs": true,
-		"noImplicitAny": true,
-		"strict": true,
+		"noImplicitAny": false,
 		"moduleResolution": "node",
 		"importHelpers": true,
 		"declaration": true,
-		"outDir": "./",
+		"outDir": "./dist",
+		"strict": true,
 		"typeRoots": [
 			"node_modules/@types"
 		],
@@ -24,6 +24,7 @@
 		"**/*.ts"
 	],
 	"exclude": [
-		"node_modules"
+		"node_modules",
+		"dist"
 	]
 } 

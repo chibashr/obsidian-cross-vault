@@ -1,177 +1,104 @@
 /* Cross Vault Plugin Styles */
 
-/* Base styles for all cross-vault links */
-a[href^="obsidian://"] {
-    color: var(--link-color) !important;
-    text-decoration: underline !important;
-    cursor: pointer !important;
+.cross-vault-link {
+    color: var(--text-accent);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--text-accent-hover);
 }
 
-/* Mapped cross-vault links - green indicator */
-.cross-vault-mapped {
-    color: var(--text-accent) !important;
-    border-bottom: 1px dotted var(--text-accent);
-    position: relative;
+.cross-vault-link:hover {
+    color: var(--text-accent-hover);
+    border-bottom-style: solid;
 }
 
-.cross-vault-mapped::before {
-    content: "🔗";
-    font-size: 0.8em;
-    margin-right: 2px;
-    opacity: 0.7;
+.cross-vault-preview {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 8px 0;
+    background: var(--background-secondary);
 }
 
-.cross-vault-mapped:hover {
-    background-color: var(--background-modifier-hover);
-    border-radius: 3px;
-    padding: 1px 2px;
+.cross-vault-preview-header {
+    font-weight: bold;
+    color: var(--text-accent);
+    margin-bottom: 8px;
+    font-size: 0.9em;
 }
 
-/* Unmapped cross-vault links - orange indicator */
-.cross-vault-unmapped {
-    color: var(--text-warning) !important;
-    border-bottom: 1px dashed var(--text-warning);
-    position: relative;
+.cross-vault-preview-content {
+    color: var(--text-normal);
+    line-height: 1.4;
 }
 
-.cross-vault-unmapped::before {
-    content: "⚠️";
-    font-size: 0.8em;
-    margin-right: 2px;
-    opacity: 0.7;
+.cross-vault-settings-vault-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    margin-bottom: 8px;
 }
 
-.cross-vault-unmapped:hover {
-    background-color: var(--background-modifier-error);
-    border-radius: 3px;
-    padding: 1px 2px;
-    cursor: pointer;
+.cross-vault-settings-vault-name {
+    flex: 1;
+    font-weight: bold;
 }
 
-/* Missing cross-vault links - red indicator */
-.cross-vault-missing {
-    color: var(--text-error) !important;
-    border-bottom: 1px solid var(--text-error);
-    position: relative;
-    text-decoration: line-through;
+.cross-vault-settings-vault-path {
+    flex: 2;
+    font-family: var(--font-monospace);
+    font-size: 0.9em;
+    color: var(--text-muted);
 }
 
-.cross-vault-missing::before {
-    content: "❌";
-    font-size: 0.8em;
-    margin-right: 2px;
-    opacity: 0.7;
+.cross-vault-settings-buttons {
+    display: flex;
+    gap: 5px;
 }
 
-/* Settings page styles */
-.cross-vault-settings {
+.cross-vault-modal {
+    min-width: 500px;
+}
+
+.cross-vault-modal-content {
     padding: 20px;
 }
 
-.cross-vault-settings h2 {
-    color: var(--text-normal);
-    margin-bottom: 20px;
-}
-
-.cross-vault-settings h3 {
-    color: var(--text-muted);
-    margin-top: 30px;
+.cross-vault-modal-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin-bottom: 15px;
-    font-size: 1.1em;
 }
 
-/* Vault mappings description */
-.vault-mappings-description {
-    margin: 20px 0;
-    padding: 15px;
-    background-color: var(--background-secondary);
-    border-radius: 5px;
+.cross-vault-modal-row label {
+    min-width: 100px;
+    font-weight: bold;
 }
 
-.vault-mappings-description ul {
-    margin: 10px 0;
-    padding-left: 20px;
+.cross-vault-modal-row input {
+    flex: 1;
 }
 
-.vault-mappings-description li {
-    margin: 5px 0;
-    color: var(--text-muted);
-    font-size: 0.9em;
+.cross-vault-cached-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-success);
+    margin-left: 5px;
+    vertical-align: middle;
 }
 
-/* Vault mappings table */
-.vault-mappings-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 20px 0;
-    background-color: var(--background-primary);
+.cross-vault-error {
+    color: var(--text-error);
+    font-style: italic;
 }
 
-.vault-mappings-table th,
-.vault-mappings-table td {
-    padding: 10px;
-    border: 1px solid var(--background-modifier-border);
-    text-align: left;
-}
-
-.vault-mappings-table th {
-    background-color: var(--background-secondary);
-    color: var(--text-normal);
-    font-weight: 600;
-}
-
-.vault-mappings-table input {
-    width: 100%;
-    background-color: var(--background-primary);
-    border: 1px solid transparent;
-    color: var(--text-normal);
-    padding: 4px 8px;
-    border-radius: 3px;
-}
-
-.vault-mappings-table input:hover,
-.vault-mappings-table input:focus {
-    border-color: var(--interactive-accent);
-    outline: none;
-}
-
-.vault-toggle-container {
-    display: flex;
-    justify-content: center;
-}
-
-.vault-toggle-container .setting-item {
-    border: none;
-    padding: 0;
-    margin: 0;
-}
-
-.vault-actions-container {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-}
-
-.vault-remove-btn {
-    background-color: var(--background-modifier-error);
-    color: var(--text-on-accent);
-    border: none;
-    border-radius: 3px;
-    padding: 4px 8px;
-    cursor: pointer;
-    font-size: 0.9em;
-}
-
-.vault-remove-btn:hover {
-    background-color: var(--background-modifier-error-hover);
-}
-
-/* Modal styles */
-.cross-vault-modal .modal-content {
-    max-width: 500px;
-}
-
-.cross-vault-modal .setting-item-description {
-    color: var(--text-muted);
-    font-size: 0.9em;
+.cross-vault-offline-indicator {
+    color: var(--text-warning);
+    font-size: 0.8em;
+    margin-left: 5px;
 } 

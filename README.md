@@ -1,110 +1,107 @@
 # Cross Vault Linker
 
-A plugin for Obsidian that enables linking and previewing pages across different vaults stored locally or at relative locations.
+An Obsidian plugin that enables seamless linking and previewing of notes across multiple vaults stored in local or relative locations.
 
 ## Features
 
-- **Cross-vault linking**: Link to files in other Obsidian vaults using `obsidian://` URLs
-- **Visual indicators**: Different visual styles for mapped, unmapped, and missing cross-vault links
-- **Hover previews**: Preview content from linked files on hover
-- **Local copy backup**: Optionally create local copies of referenced files for offline access
-- **Easy vault mapping**: Map vault names to their file system locations through settings or context menu
-- **Click-to-map**: Right-click on unmapped `obsidian://` links to quickly set up vault mappings
+### 🔗 Cross-Vault Linking
+- Process `obsidian://` URLs that reference other vaults
+- Visual indicators for mapped and unmapped vaults
+- Click to open cross-vault references
+- Context menu support for quick vault mapping
+
+### 👀 Live Previews
+- Hover over cross-vault links to see content previews
+- Display file content from external vaults
+- Visual indicators for cached vs. non-cached files
+
+### 📁 Local File Caching
+- Optional copying of referenced files to current vault
+- Offline access to external vault content
+- Automatic cache management and updates
+
+### ⚙️ Flexible Settings
+- Browse button for easy vault path selection
+- Configurable vault mappings with descriptions
+- Default copy-locally behavior
+- Edit and delete existing mappings
+
+## Usage
+
+### Setting Up Vault Mappings
+
+1. Go to Settings → Cross Vault Linker
+2. Click "Add New Vault Mapping"
+3. Enter the vault name as it appears in obsidian:// URLs
+4. Browse to or enter the local path to that vault
+5. Optionally enable "Copy Locally" for offline access
+6. Add a description for reference
+
+### Mapping from Links
+
+1. Select an `obsidian://` link in your editor
+2. Right-click and choose "Map Vault"
+3. Configure the vault location in the dialog
+4. The plugin will remember this mapping for future use
+
+### Example Workflow
+
+Given an obsidian link like:
+```
+obsidian://open?vault=MyProject&file=Meeting%20Notes
+```
+
+1. The plugin will look for a vault mapping named "MyProject"
+2. If mapped, it will display the file with visual indicators
+3. Hover to preview the content
+4. Click to open the file (or local copy if cached)
+5. If unmapped, the link shows an error state with quick mapping options
+
+## Settings
+
+### Default Copy Locally
+When enabled, new vault mappings will default to copying files locally for offline access.
+
+### Vault Mappings
+- **Name**: The vault name as it appears in obsidian:// URLs
+- **Path**: Local file system path to the vault
+- **Copy Locally**: Whether to cache files from this vault
+- **Description**: Optional description for organization
 
 ## Installation
 
 ### Manual Installation
-
-1. Download the latest release from the releases page
-2. Extract the files to your vault's `.obsidian/plugins/obsidian-cross-vault/` directory
-3. Enable the plugin in Obsidian's Community Plugins settings
-
-### From Source
-
-1. Clone this repository into your vault's `.obsidian/plugins/` directory
-2. Run `npm install` to install dependencies
-3. Run `npm run build` to build the plugin
+1. Download the plugin files
+2. Create a folder in `.obsidian/plugins/` called `obsidian-cross-vault`
+3. Copy the plugin files into this folder
 4. Enable the plugin in Obsidian's Community Plugins settings
 
-## Usage
-
-### Setting up vault mappings
-
-1. Go to Settings → Community Plugins → Cross Vault Linker
-2. Click "Add mapping" to create a new vault mapping
-3. Enter the vault name as it appears in `obsidian://` URLs
-4. Enter the path to the vault (absolute or relative to current vault)
-5. Optionally enable local copy for offline access
-
-### Using cross-vault links
-
-1. Paste an `obsidian://` URL in your note (e.g., `obsidian://open?vault=MyVault&file=MyFile`)
-2. The link will show different visual indicators:
-   - 🔗 **Green dotted underline**: Mapped and file found
-   - ⚠️ **Orange dashed underline**: Vault not mapped (click to map)
-   - ❌ **Red strikethrough**: File not found
-
-### Quick vault mapping
-
-1. Select an `obsidian://` URL in your editor
-2. Right-click and choose "Map vault"
-3. Enter the vault path in the dialog
-
-### Local copy feature
-
-When enabled for a vault:
-- Files are automatically copied to a local folder named after the source vault
-- If the original file becomes unavailable, the local copy is used instead
-- Local copies are created in `YourVault/VaultName/filename.md`
-
-## Configuration
-
-The plugin stores its settings in `data.json` with the following structure:
-
-```json
-{
-  "vaultMappings": {
-    "VaultName": "/path/to/vault"
-  },
-  "enableLocalCopy": {
-    "VaultName": true
-  }
-}
+### Development
+```bash
+npm install
+npm run dev
 ```
 
-## Commands
-
-- **Open cross-vault file**: Open the command palette and search for "Open cross-vault file" to manually open files from mapped vaults
-
-## Supported URL Format
-
-The plugin supports standard Obsidian URLs:
-```
-obsidian://open?vault=VaultName&file=FileName
+### Building
+```bash
+npm run build
 ```
 
-Where:
-- `VaultName` is the name of the target vault
-- `FileName` is the name of the file (without .md extension)
+## Technical Details
 
-## Limitations
-
-- Desktop only (file system access required)
-- Requires manual vault mapping setup
-- Cross-vault files open in read-only mode within the current vault context
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+- **Desktop Only**: This plugin requires file system access and is not compatible with mobile versions
+- **File Types**: Supports .md and .txt files with automatic extension detection
+- **Path Resolution**: Handles URL encoding and various file naming conventions
+- **Error Handling**: Graceful fallbacks for missing files or unmapped vaults
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License
 
-## Support
+## Contributing
 
-If you encounter issues or have feature requests, please create an issue on the GitHub repository. 
+Contributions are welcome! Please submit issues and pull requests to help improve the plugin.
+
+## Privacy
+
+This plugin operates entirely locally and does not transmit any data externally. All vault mappings and cached files remain on your local system. 
