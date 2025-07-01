@@ -1,6 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, requestUrl, Menu, Editor, MarkdownView, Component, Modal } from 'obsidian';
-import { EditorView, ViewPlugin, ViewUpdate, DecorationSet, Decoration } from '@codemirror/view';
-import { WidgetType } from '@codemirror/view';
+import { EditorView, ViewPlugin, ViewUpdate, DecorationSet, Decoration, WidgetType } from '@codemirror/view';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -116,7 +115,8 @@ export default class CrossVaultPlugin extends Plugin {
 
 	private enhanceObsidianLink(linkElement: HTMLAnchorElement, parsedUrl: ObsidianUrl, vaultMapping: VaultMapping, fileContent: string) {
 		// Update link text and style
-		linkElement.textContent = `${parsedUrl.vault}/${parsedUrl.file}`;
+		const displayText = this.getDisplayText(parsedUrl);
+		linkElement.textContent = displayText;
 		linkElement.className = 'cross-vault-link';
 		linkElement.title = `Click to open in ${vaultMapping.name} vault`;
 
@@ -278,6 +278,14 @@ export default class CrossVaultPlugin extends Plugin {
 		return text.startsWith('obsidian://');
 	}
 
+	private getDisplayText(parsedUrl: ObsidianUrl): string {
+		// Remove file extension if present
+		const file = parsedUrl.file.replace(/\.md$/, '');
+		// Replace URL-encoded characters
+		const decodedFile = decodeURIComponent(file);
+		return `${parsedUrl.vault}/${decodedFile}`;
+	}
+
 	private getVaultMapping(vaultName: string): VaultMapping | null {
 		return this.settings.vaultMappings.find(mapping => mapping.name === vaultName) || null;
 	}
@@ -317,6 +325,13 @@ export default class CrossVaultPlugin extends Plugin {
 					const from = match.index;
 					const to = from + match[0].length;
 
+					// Add the link styling and replace text
+					const displayText = this.plugin.getDisplayText(parsedUrl);
+					widgets.push(Decoration.replace({
+						widget: new CrossVaultDisplayWidget(displayText),
+					}).range(from, to));
+
+					// Add the status widget
 					widgets.push(Decoration.widget({
 						widget: new CrossVaultLinkWidget(this.plugin, parsedUrl, vaultMapping),
 						side: 1
@@ -549,6 +564,19 @@ class AddVaultModal extends Modal {
 		new Notice(`Vault "${name}" added successfully`);
 		this.callback(); // Refresh the settings display
 		this.close();
+	}
+}
+
+class CrossVaultDisplayWidget extends WidgetType {
+	constructor(private text: string) {
+		super();
+	}
+
+	toDOM() {
+		const span = document.createElement('span');
+		span.className = 'cross-vault-link';
+		span.textContent = this.text;
+		return span;
 	}
 }
 
