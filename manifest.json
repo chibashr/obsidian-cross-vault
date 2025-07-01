@@ -1,11 +1,10 @@
 {
 	"id": "obsidian-cross-vault",
-	"name": "Cross Vault Linker",
+	"name": "Cross Vault Navigator",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Link and preview pages across different Obsidian vaults with local file caching support",
+	"description": "Navigate and link to pages across different Obsidian vaults with local caching support",
 	"author": "chibashr",
 	"authorUrl": "https://github.com/chibashr",
-	"fundingUrl": "",
-	"isDesktopOnly": true
+	"isDesktopOnly": false
 } 

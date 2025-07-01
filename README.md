@@ -1,107 +1,102 @@
-# Cross Vault Linker
+# Cross Vault Navigator
 
-An Obsidian plugin that enables seamless linking and previewing of notes across multiple vaults stored in local or relative locations.
+An Obsidian plugin that enables seamless navigation and linking between different Obsidian vaults stored locally or in relative paths.
 
 ## Features
 
-### 🔗 Cross-Vault Linking
-- Process `obsidian://` URLs that reference other vaults
-- Visual indicators for mapped and unmapped vaults
-- Click to open cross-vault references
-- Context menu support for quick vault mapping
+- **Cross-Vault Linking**: Parse and handle `obsidian://` URLs to link to notes in other vaults
+- **Vault Mapping**: Configure local paths for external vaults in the plugin settings
+- **Preview Support**: Hover over cross-vault links to preview content from external vaults
+- **Local Caching**: Optional feature to cache referenced files locally for offline access
+- **Context Menu Integration**: Right-click on `obsidian://` links to quickly map unknown vaults
+- **Status Indicators**: Visual indicators showing the status of cross-vault links
 
-### 👀 Live Previews
-- Hover over cross-vault links to see content previews
-- Display file content from external vaults
-- Visual indicators for cached vs. non-cached files
+## Installation
 
-### 📁 Local File Caching
-- Optional copying of referenced files to current vault
-- Offline access to external vault content
-- Automatic cache management and updates
+### Manual Installation
 
-### ⚙️ Flexible Settings
-- Browse button for easy vault path selection
-- Configurable vault mappings with descriptions
-- Default copy-locally behavior
-- Edit and delete existing mappings
+1. Download the latest release from the GitHub repository
+2. Extract the files to your vault's `.obsidian/plugins/obsidian-cross-vault/` directory
+3. Enable the plugin in Obsidian's Community Plugins settings
+
+### Development Installation
+
+1. Clone this repository into your vault's `.obsidian/plugins/` directory
+2. Navigate to the plugin directory and run:
+   ```bash
+   npm install
+   npm run build
+   ```
+3. Enable the plugin in Obsidian
 
 ## Usage
 
 ### Setting Up Vault Mappings
 
-1. Go to Settings → Cross Vault Linker
-2. Click "Add New Vault Mapping"
-3. Enter the vault name as it appears in obsidian:// URLs
-4. Browse to or enter the local path to that vault
-5. Optionally enable "Copy Locally" for offline access
-6. Add a description for reference
+1. Open Obsidian Settings
+2. Navigate to "Cross Vault Navigator" in the Plugin Options
+3. Click "Add Vault" to create a new vault mapping
+4. Enter the vault name and local path
+5. Optionally enable "Local Cache" for offline access
 
-### Mapping from Links
+### Using Cross-Vault Links
+
+Once vault mappings are configured, paste any `obsidian://` link into your notes:
+
+```
+obsidian://open?vault=ExampleVault&file=Example%20Note
+```
+
+The plugin will:
+- Display a status indicator (✓ for success, ? for unmapped vault, ✗ for errors)
+- Provide hover previews of the linked content
+- Allow clicking to open the referenced file
+
+### Quick Vault Mapping
 
 1. Select an `obsidian://` link in your editor
-2. Right-click and choose "Map Vault"
-3. Configure the vault location in the dialog
-4. The plugin will remember this mapping for future use
+2. Right-click to open the context menu
+3. Select "Map Vault" to quickly configure the vault path
 
-### Example Workflow
+## Configuration
 
-Given an obsidian link like:
-```
-obsidian://open?vault=MyProject&file=Meeting%20Notes
-```
+### Vault Mapping Settings
 
-1. The plugin will look for a vault mapping named "MyProject"
-2. If mapped, it will display the file with visual indicators
-3. Hover to preview the content
-4. Click to open the file (or local copy if cached)
-5. If unmapped, the link shows an error state with quick mapping options
+- **Vault Name**: The name of the external vault as it appears in `obsidian://` URLs
+- **Vault Path**: The local file system path to the vault directory
+- **Enable Local Cache**: When enabled, referenced files are cached locally
 
-## Settings
+### Commands
 
-### Default Copy Locally
-When enabled, new vault mappings will default to copying files locally for offline access.
+- **Refresh Cross-Vault Links**: Refreshes all cross-vault links in the current note
 
-### Vault Mappings
-- **Name**: The vault name as it appears in obsidian:// URLs
-- **Path**: Local file system path to the vault
-- **Copy Locally**: Whether to cache files from this vault
-- **Description**: Optional description for organization
+## Development
 
-## Installation
+### Building the Plugin
 
-### Manual Installation
-1. Download the plugin files
-2. Create a folder in `.obsidian/plugins/` called `obsidian-cross-vault`
-3. Copy the plugin files into this folder
-4. Enable the plugin in Obsidian's Community Plugins settings
-
-### Development
 ```bash
 npm install
-npm run dev
-```
-
-### Building
-```bash
 npm run build
 ```
 
-## Technical Details
+### Development Mode
 
-- **Desktop Only**: This plugin requires file system access and is not compatible with mobile versions
-- **File Types**: Supports .md and .txt files with automatic extension detection
-- **Path Resolution**: Handles URL encoding and various file naming conventions
-- **Error Handling**: Graceful fallbacks for missing files or unmapped vaults
+```bash
+npm run dev
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
 
 ## License
 
 MIT License
 
-## Contributing
+## Author
 
-Contributions are welcome! Please submit issues and pull requests to help improve the plugin.
+chibashr
 
-## Privacy
+## Support
 
-This plugin operates entirely locally and does not transmit any data externally. All vault mappings and cached files remain on your local system. 
+For support and bug reports, please use the GitHub issues page. 

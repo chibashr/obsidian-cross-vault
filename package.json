@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-cross-vault",
 	"version": "1.0.0",
-	"description": "Link and preview pages across different Obsidian vaults",
+	"description": "Navigate and link to pages across different Obsidian vaults",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",

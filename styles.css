@@ -1,95 +1,53 @@
-/* Cross Vault Plugin Styles */
+/* Cross Vault Navigator Plugin Styles */
 
-.cross-vault-link {
-    color: var(--text-accent);
-    text-decoration: none;
-    border-bottom: 1px dashed var(--text-accent-hover);
+.cross-vault-settings {
+    padding: 20px;
 }
 
-.cross-vault-link:hover {
-    color: var(--text-accent-hover);
-    border-bottom-style: solid;
+.cross-vault-settings h3 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    color: var(--text-normal);
+}
+
+.vault-mapping {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 5px;
+}
+
+.vault-mapping input {
+    margin-right: 10px;
+    flex: 1;
+}
+
+.vault-mapping button {
+    margin-left: 5px;
+}
+
+.add-vault-button {
+    margin-top: 10px;
 }
 
 .cross-vault-preview {
     border: 1px solid var(--background-modifier-border);
-    border-radius: 8px;
-    padding: 16px;
-    margin: 8px 0;
-    background: var(--background-secondary);
+    border-radius: 5px;
+    padding: 10px;
+    margin: 5px 0;
+    background-color: var(--background-secondary);
 }
 
-.cross-vault-preview-header {
-    font-weight: bold;
+.cross-vault-link {
     color: var(--text-accent);
-    margin-bottom: 8px;
-    font-size: 0.9em;
+    text-decoration: none;
+    cursor: pointer;
 }
 
-.cross-vault-preview-content {
-    color: var(--text-normal);
-    line-height: 1.4;
-}
-
-.cross-vault-settings-vault-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    margin-bottom: 8px;
-}
-
-.cross-vault-settings-vault-name {
-    flex: 1;
-    font-weight: bold;
-}
-
-.cross-vault-settings-vault-path {
-    flex: 2;
-    font-family: var(--font-monospace);
-    font-size: 0.9em;
-    color: var(--text-muted);
-}
-
-.cross-vault-settings-buttons {
-    display: flex;
-    gap: 5px;
-}
-
-.cross-vault-modal {
-    min-width: 500px;
-}
-
-.cross-vault-modal-content {
-    padding: 20px;
-}
-
-.cross-vault-modal-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 15px;
-}
-
-.cross-vault-modal-row label {
-    min-width: 100px;
-    font-weight: bold;
-}
-
-.cross-vault-modal-row input {
-    flex: 1;
-}
-
-.cross-vault-cached-indicator {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: var(--text-success);
-    margin-left: 5px;
-    vertical-align: middle;
+.cross-vault-link:hover {
+    text-decoration: underline;
 }
 
 .cross-vault-error {
@@ -97,8 +55,21 @@
     font-style: italic;
 }
 
-.cross-vault-offline-indicator {
-    color: var(--text-warning);
+.cross-vault-status {
     font-size: 0.8em;
+    color: var(--text-muted);
     margin-left: 5px;
+}
+
+.browse-button {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.browse-button:hover {
+    background-color: var(--interactive-accent-hover);
 } 

@@ -1,40 +1,29 @@
-import {
-	App,
-	Plugin,
-	PluginSettingTab,
-	Setting,
-	TFile,
-	Modal,
-	Notice,
-	Menu,
-	MarkdownView,
-	Component,
-	MarkdownRenderer,
-	normalizePath
-} from 'obsidian';
-
+import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, requestUrl, Menu, Editor, MarkdownView, Component } from 'obsidian';
 import * as path from 'path';
 import * as fs from 'fs';
 
 interface VaultMapping {
 	name: string;
 	path: string;
-	copyLocally: boolean;
-	description?: string;
+	enableLocalCache: boolean;
 }
 
 interface CrossVaultSettings {
 	vaultMappings: VaultMapping[];
-	defaultCopyLocally: boolean;
 }
 
 const DEFAULT_SETTINGS: CrossVaultSettings = {
-	vaultMappings: [],
-	defaultCopyLocally: false
+	vaultMappings: []
 };
 
+interface ObsidianUrl {
+	vault: string;
+	file: string;
+	originalUrl: string;
+}
+
 export default class CrossVaultPlugin extends Plugin {
-	settings: CrossVaultSettings = DEFAULT_SETTINGS;
+	settings!: CrossVaultSettings;
 
 	async onload() {
 		await this.loadSettings();
@@ -42,40 +31,39 @@ export default class CrossVaultPlugin extends Plugin {
 		// Add settings tab
 		this.addSettingTab(new CrossVaultSettingTab(this.app, this));
 
-		// Register link processor for obsidian:// URLs
-		this.registerMarkdownPostProcessor((element, context) => {
-			this.processObsidianLinks(element, context);
-		});
-
-		// Add context menu for obsidian:// links
+		// Register context menu for obsidian:// links
 		this.registerEvent(
-			this.app.workspace.on('editor-menu', (menu, editor, view) => {
-				if (view instanceof MarkdownView) {
-					this.addContextMenu(menu, editor, view);
+			this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor) => {
+				const selection = editor.getSelection();
+				if (this.isObsidianUrl(selection)) {
+					menu.addItem((item) => {
+						item.setTitle('Map Vault')
+							.setIcon('folder-plus')
+							.onClick(() => {
+								const parsedUrl = this.parseObsidianUrl(selection);
+								if (parsedUrl) {
+									this.showVaultMappingDialog(parsedUrl);
+								}
+							});
+					});
 				}
 			})
 		);
 
-		// Add command to manually map a vault
+		// Register markdown processor for obsidian:// links
+		this.registerMarkdownProcessor();
+
+		// Register command to refresh cross-vault links
 		this.addCommand({
-			id: 'map-vault',
-			name: 'Map Vault from Selection',
-			editorCallback: (editor, view) => {
-				const selection = editor.getSelection();
-				if (this.isObsidianLink(selection)) {
-					this.openVaultMappingModal(selection);
-				} else {
-					new Notice('Please select an obsidian:// link first');
-				}
+			id: 'refresh-cross-vault-links',
+			name: 'Refresh Cross-Vault Links',
+			callback: () => {
+				this.refreshCurrentNote();
 			}
 		});
-
-		console.log('Cross Vault Plugin loaded');
 	}
 
-	onunload() {
-		console.log('Cross Vault Plugin unloaded');
-	}
+	onunload() {}
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -85,380 +73,243 @@ export default class CrossVaultPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	private isObsidianLink(text: string): boolean {
-		return text.startsWith('obsidian://');
+	private registerMarkdownProcessor() {
+		this.registerMarkdownPostProcessor((element, context) => {
+			const links = element.querySelectorAll('a[href^="obsidian://"]');
+			links.forEach((link) => {
+				this.processObsidianLink(link as HTMLAnchorElement, context);
+			});
+		});
 	}
 
-	private parseObsidianLink(url: string): { vault: string; file: string } | null {
+	private async processObsidianLink(linkElement: HTMLAnchorElement, context: any) {
+		const url = linkElement.href;
+		const parsedUrl = this.parseObsidianUrl(url);
+		
+		if (!parsedUrl) return;
+
+		const vaultMapping = this.getVaultMapping(parsedUrl.vault);
+		
+		if (!vaultMapping) {
+			this.addUnmappedVaultIndicator(linkElement, parsedUrl.vault);
+			return;
+		}
+
+		try {
+			const fileContent = await this.getFileFromVault(vaultMapping, parsedUrl.file);
+			if (fileContent) {
+				this.enhanceObsidianLink(linkElement, parsedUrl, vaultMapping, fileContent);
+			} else {
+				this.addErrorIndicator(linkElement, 'File not found');
+			}
+		} catch (error) {
+			this.addErrorIndicator(linkElement, 'Error loading file');
+		}
+	}
+
+	private enhanceObsidianLink(linkElement: HTMLAnchorElement, parsedUrl: ObsidianUrl, vaultMapping: VaultMapping, fileContent: string) {
+		// Add status indicator
+		const statusSpan = document.createElement('span');
+		statusSpan.className = 'cross-vault-status';
+		statusSpan.textContent = '✓';
+		statusSpan.title = `Linked to: ${vaultMapping.path}`;
+		linkElement.appendChild(statusSpan);
+
+		// Create preview on hover
+		linkElement.addEventListener('mouseenter', () => {
+			this.showPreview(linkElement, fileContent, parsedUrl.file);
+		});
+
+		// Handle click to open file
+		linkElement.addEventListener('click', (e) => {
+			e.preventDefault();
+			this.openCrossVaultFile(vaultMapping, parsedUrl.file, fileContent);
+		});
+	}
+
+	private addUnmappedVaultIndicator(linkElement: HTMLAnchorElement, vaultName: string) {
+		const statusSpan = document.createElement('span');
+		statusSpan.className = 'cross-vault-status cross-vault-error';
+		statusSpan.textContent = '?';
+		statusSpan.title = `Vault "${vaultName}" not mapped. Click to map.`;
+		statusSpan.addEventListener('click', () => {
+			this.showVaultMappingDialog({ vault: vaultName, file: '', originalUrl: linkElement.href });
+		});
+		linkElement.appendChild(statusSpan);
+	}
+
+	private addErrorIndicator(linkElement: HTMLAnchorElement, message: string) {
+		const statusSpan = document.createElement('span');
+		statusSpan.className = 'cross-vault-status cross-vault-error';
+		statusSpan.textContent = '✗';
+		statusSpan.title = message;
+		linkElement.appendChild(statusSpan);
+	}
+
+	private showPreview(element: HTMLElement, content: string, fileName: string) {
+		const preview = document.createElement('div');
+		preview.className = 'cross-vault-preview';
+		preview.innerHTML = `
+			<strong>${fileName}</strong><br>
+			${content.substring(0, 200)}${content.length > 200 ? '...' : ''}
+		`;
+		
+		const rect = element.getBoundingClientRect();
+		preview.style.position = 'absolute';
+		preview.style.top = `${rect.bottom + 5}px`;
+		preview.style.left = `${rect.left}px`;
+		preview.style.zIndex = '1000';
+		preview.style.maxWidth = '300px';
+		
+		document.body.appendChild(preview);
+		
+		const removePreview = () => {
+			if (preview.parentNode) {
+				preview.parentNode.removeChild(preview);
+			}
+		};
+		
+		element.addEventListener('mouseleave', removePreview);
+		setTimeout(removePreview, 5000); // Auto-remove after 5 seconds
+	}
+
+	private async openCrossVaultFile(vaultMapping: VaultMapping, fileName: string, content: string) {
+		if (vaultMapping.enableLocalCache) {
+			// Save to local cache and open
+			await this.cacheFileLocally(vaultMapping.name, fileName, content);
+		}
+		
+		// Try to open the original vault file
+		try {
+			const originalPath = path.join(vaultMapping.path, fileName + '.md');
+			if (fs.existsSync(originalPath)) {
+				// Open in system default app or show notice
+				new Notice(`Opening file from ${vaultMapping.name}: ${fileName}`);
+				// Note: Direct file opening depends on system capabilities
+			}
+		} catch (error) {
+			new Notice(`Cannot open file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		}
+	}
+
+	private async cacheFileLocally(vaultName: string, fileName: string, content: string) {
+		try {
+			const adapter = this.app.vault.adapter as any;
+			const basePath = adapter.basePath || adapter.path || '';
+			const cacheDir = path.join(basePath, vaultName);
+			
+			// Create cache directory if it doesn't exist
+			if (!fs.existsSync(cacheDir)) {
+				fs.mkdirSync(cacheDir, { recursive: true });
+			}
+			
+			const localPath = path.join(cacheDir, fileName + '.md');
+			fs.writeFileSync(localPath, content);
+			
+			new Notice(`File cached locally: ${vaultName}/${fileName}`);
+		} catch (error) {
+			new Notice(`Failed to cache file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		}
+	}
+
+	private async getFileFromVault(vaultMapping: VaultMapping, fileName: string): Promise<string | null> {
+		try {
+			const filePath = path.join(vaultMapping.path, fileName + '.md');
+			
+			if (fs.existsSync(filePath)) {
+				return fs.readFileSync(filePath, 'utf8');
+			}
+			
+			// Try without .md extension
+			const filePathWithoutExt = path.join(vaultMapping.path, fileName);
+			if (fs.existsSync(filePathWithoutExt)) {
+				return fs.readFileSync(filePathWithoutExt, 'utf8');
+			}
+			
+			return null;
+		} catch (error) {
+			console.error('Error reading file from vault:', error);
+			return null;
+		}
+	}
+
+	private parseObsidianUrl(url: string): ObsidianUrl | null {
 		try {
 			const urlObj = new URL(url);
-			if (urlObj.protocol !== 'obsidian:' || urlObj.hostname !== 'open') {
-				return null;
-			}
-
+			if (urlObj.protocol !== 'obsidian:') return null;
+			
 			const vault = urlObj.searchParams.get('vault');
 			const file = urlObj.searchParams.get('file');
-
-			if (!vault || !file) {
-				return null;
-			}
-
-			return { vault, file: decodeURIComponent(file) };
+			
+			if (!vault || !file) return null;
+			
+			return {
+				vault: decodeURIComponent(vault),
+				file: decodeURIComponent(file),
+				originalUrl: url
+			};
 		} catch (error) {
 			return null;
 		}
+	}
+
+	private isObsidianUrl(text: string): boolean {
+		return text.startsWith('obsidian://');
 	}
 
 	private getVaultMapping(vaultName: string): VaultMapping | null {
 		return this.settings.vaultMappings.find(mapping => mapping.name === vaultName) || null;
 	}
 
-	private async processObsidianLinks(element: HTMLElement, context: any) {
-		const links = element.querySelectorAll('a[href^="obsidian://"]');
-		
-		for (let i = 0; i < links.length; i++) {
-			const link = links[i] as HTMLAnchorElement;
-			await this.processObsidianLink(link, context);
+	private async showVaultMappingDialog(parsedUrl: ObsidianUrl) {
+		const modal = new VaultMappingModal(this.app, this, parsedUrl);
+		modal.open();
+	}
+
+	private refreshCurrentNote() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (activeView) {
+			activeView.previewMode.rerender(true);
+			new Notice('Cross-vault links refreshed');
 		}
 	}
 
-	private async processObsidianLink(link: HTMLAnchorElement, context: any) {
-		const href = link.getAttribute('href');
-		if (!href) return;
-
-		const parsed = this.parseObsidianLink(href);
-		if (!parsed) return;
-
-		const mapping = this.getVaultMapping(parsed.vault);
-		
-		// Add styling to indicate it's a cross-vault link
-		link.addClass('cross-vault-link');
-
-		// Add click handler
-		link.addEventListener('click', (e) => {
-			e.preventDefault();
-			this.handleObsidianLinkClick(parsed, mapping);
-		});
-
-		// Add preview on hover
-		link.addEventListener('mouseenter', (e) => {
-			this.showPreview(link, parsed, mapping);
-		});
-
-		// Update link text to show vault info
-		if (mapping) {
-			const cached = await this.isFileCached(parsed.vault, parsed.file);
-			const indicator = cached ? 
-				`<span class="cross-vault-cached-indicator" title="Cached locally"></span>` : 
-				`<span class="cross-vault-offline-indicator" title="Not cached">⚠</span>`;
-			
-			if (!link.innerHTML.includes('cross-vault')) {
-				link.innerHTML = `${link.innerHTML} (${parsed.vault})${indicator}`;
-			}
-		} else {
-			if (!link.innerHTML.includes('unmapped')) {
-				link.innerHTML = `${link.innerHTML} <span class="cross-vault-error" title="Vault not mapped">(unmapped: ${parsed.vault})</span>`;
-			}
-		}
+	addVaultMapping(mapping: VaultMapping) {
+		// Remove existing mapping with same name
+		this.settings.vaultMappings = this.settings.vaultMappings.filter(m => m.name !== mapping.name);
+		this.settings.vaultMappings.push(mapping);
+		this.saveSettings();
 	}
 
-	private async handleObsidianLinkClick(parsed: { vault: string; file: string }, mapping: VaultMapping | null) {
-		if (!mapping) {
-			new Notice(`Vault "${parsed.vault}" is not mapped. Please configure it in settings.`);
-			return;
-		}
-
-		try {
-			const filePath = await this.resolveFilePath(mapping, parsed.file);
-			if (filePath && await this.fileExists(filePath)) {
-				// Try to open the file in current vault if it was copied locally
-				if (mapping.copyLocally) {
-					const localPath = this.getLocalCopyPath(parsed.vault, parsed.file);
-					const localFile = this.app.vault.getAbstractFileByPath(localPath);
-					if (localFile instanceof TFile) {
-						await this.app.workspace.getLeaf().openFile(localFile);
-						return;
-					}
-				}
-
-				// Open external file (this would require additional implementation)
-				new Notice(`Opening external file: ${parsed.file} from ${parsed.vault}`);
-			} else {
-				new Notice(`File not found: ${parsed.file} in vault ${parsed.vault}`);
-			}
-		} catch (error: any) {
-			console.error('Error opening cross-vault file:', error);
-			new Notice(`Error opening file: ${error.message}`);
-		}
-	}
-
-	private async showPreview(link: HTMLAnchorElement, parsed: { vault: string; file: string }, mapping: VaultMapping | null) {
-		if (!mapping) return;
-
-		// Remove existing preview
-		const existingPreview = document.querySelector('.cross-vault-preview');
-		if (existingPreview) {
-			existingPreview.remove();
-		}
-
-		try {
-			const content = await this.getFileContent(mapping, parsed.file);
-			if (content) {
-				const preview = this.createPreviewElement(parsed, content);
-				document.body.appendChild(preview);
-
-				// Position the preview
-				const rect = link.getBoundingClientRect();
-				preview.style.position = 'absolute';
-				preview.style.left = `${rect.left}px`;
-				preview.style.top = `${rect.bottom + 5}px`;
-				preview.style.zIndex = '1000';
-
-				// Remove preview on mouse leave
-				const removePreview = () => {
-					preview.remove();
-					link.removeEventListener('mouseleave', removePreview);
-				};
-				link.addEventListener('mouseleave', removePreview);
-			}
-		} catch (error) {
-			console.error('Error showing preview:', error);
-		}
-	}
-
-	private createPreviewElement(parsed: { vault: string; file: string }, content: string): HTMLElement {
-		const preview = document.createElement('div');
-		preview.className = 'cross-vault-preview';
-
-		const header = document.createElement('div');
-		header.className = 'cross-vault-preview-header';
-		header.textContent = `${parsed.file} (${parsed.vault})`;
-
-		const contentEl = document.createElement('div');
-		contentEl.className = 'cross-vault-preview-content';
-		
-		// Render markdown content (simplified version)
-		const truncatedContent = content.substring(0, 500) + (content.length > 500 ? '...' : '');
-		contentEl.textContent = truncatedContent;
-
-		preview.appendChild(header);
-		preview.appendChild(contentEl);
-
-		return preview;
-	}
-
-	private async resolveFilePath(mapping: VaultMapping, fileName: string): Promise<string | null> {
-		try {
-			// Handle different file name formats
-			const normalizedFileName = fileName.replace(/%20/g, ' ');
-			const possibleExtensions = ['', '.md', '.txt'];
-			
-			for (const ext of possibleExtensions) {
-				const fullPath = path.join(mapping.path, normalizedFileName + ext);
-				if (await this.fileExists(fullPath)) {
-					return fullPath;
-				}
-			}
-
-			return null;
-		} catch (error) {
-			console.error('Error resolving file path:', error);
-			return null;
-		}
-	}
-
-	private async fileExists(filePath: string): Promise<boolean> {
-		try {
-			return fs.existsSync(filePath);
-		} catch (error) {
-			return false;
-		}
-	}
-
-	private async getFileContent(mapping: VaultMapping, fileName: string): Promise<string | null> {
-		try {
-			const filePath = await this.resolveFilePath(mapping, fileName);
-			if (!filePath) return null;
-
-			// Check local cache first
-			if (mapping.copyLocally) {
-				const cachedContent = await this.getCachedContent(mapping.name, fileName);
-				if (cachedContent) return cachedContent;
-			}
-
-			// Read from source vault
-			const content = fs.readFileSync(filePath, 'utf8');
-			
-			// Cache locally if enabled
-			if (mapping.copyLocally) {
-				await this.cacheFile(mapping.name, fileName, content);
-			}
-
-			return content;
-		} catch (error) {
-			console.error('Error reading file content:', error);
-			return null;
-		}
-	}
-
-	private getLocalCopyPath(vaultName: string, fileName: string): string {
-		return normalizePath(`${vaultName}/${fileName}`);
-	}
-
-	private async isFileCached(vaultName: string, fileName: string): Promise<boolean> {
-		const localPath = this.getLocalCopyPath(vaultName, fileName);
-		const file = this.app.vault.getAbstractFileByPath(localPath);
-		return file instanceof TFile;
-	}
-
-	private async getCachedContent(vaultName: string, fileName: string): Promise<string | null> {
-		try {
-			const localPath = this.getLocalCopyPath(vaultName, fileName);
-			const file = this.app.vault.getAbstractFileByPath(localPath);
-			if (file instanceof TFile) {
-				return await this.app.vault.read(file);
-			}
-			return null;
-		} catch (error) {
-			return null;
-		}
-	}
-
-	private async cacheFile(vaultName: string, fileName: string, content: string): Promise<void> {
-		try {
-			const localPath = this.getLocalCopyPath(vaultName, fileName);
-			const folder = path.dirname(localPath);
-			
-			// Create folder if it doesn't exist
-			if (!await this.app.vault.adapter.exists(folder)) {
-				await this.app.vault.createFolder(folder);
-			}
-
-			// Create or update the file
-			const existingFile = this.app.vault.getAbstractFileByPath(localPath);
-			if (existingFile instanceof TFile) {
-				await this.app.vault.modify(existingFile, content);
-			} else {
-				await this.app.vault.create(localPath, content);
-			}
-		} catch (error) {
-			console.error('Error caching file:', error);
-		}
-	}
-
-	private addContextMenu(menu: Menu, editor: any, view: MarkdownView) {
-		const selection = editor.getSelection();
-		if (this.isObsidianLink(selection)) {
-			menu.addItem((item) => {
-				item
-					.setTitle('Map Vault')
-					.setIcon('link')
-					.onClick(() => {
-						this.openVaultMappingModal(selection);
-					});
-			});
-		}
-	}
-
-	private openVaultMappingModal(obsidianUrl: string) {
-		const parsed = this.parseObsidianLink(obsidianUrl);
-		if (!parsed) {
-			new Notice('Invalid obsidian:// URL');
-			return;
-		}
-
-		new VaultMappingModal(this.app, this, parsed.vault).open();
+	removeVaultMapping(name: string) {
+		this.settings.vaultMappings = this.settings.vaultMappings.filter(m => m.name !== name);
+		this.saveSettings();
 	}
 }
 
-class VaultMappingModal extends Modal {
+class VaultMappingModal extends Component {
 	plugin: CrossVaultPlugin;
-	vaultName: string;
-	pathInput!: HTMLInputElement;
-	copyLocallyToggle!: HTMLInputElement;
-	descriptionInput!: HTMLInputElement;
+	parsedUrl: ObsidianUrl;
+	modal: any;
 
-	constructor(app: App, plugin: CrossVaultPlugin, vaultName: string) {
-		super(app);
+	constructor(app: App, plugin: CrossVaultPlugin, parsedUrl: ObsidianUrl) {
+		super();
 		this.plugin = plugin;
-		this.vaultName = vaultName;
+		this.parsedUrl = parsedUrl;
 	}
 
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.addClass('cross-vault-modal');
-
-		contentEl.createEl('h2', { text: `Map Vault: ${this.vaultName}` });
-
-		const content = contentEl.createDiv('cross-vault-modal-content');
-
-		// Vault path setting
-		const pathRow = content.createDiv('cross-vault-modal-row');
-		pathRow.createEl('label', { text: 'Vault Path:' });
-		this.pathInput = pathRow.createEl('input', { type: 'text' });
-		const browseBtn = pathRow.createEl('button', { text: 'Browse' });
-		
-		browseBtn.addEventListener('click', async () => {
-			// Note: File dialog functionality requires additional setup for desktop apps
-			// For now, users can manually enter the path
-			new Notice('Please manually enter the vault path. Browse functionality requires additional desktop integration.');
-		});
-
-		// Copy locally setting
-		const copyRow = content.createDiv('cross-vault-modal-row');
-		copyRow.createEl('label', { text: 'Copy Locally:' });
-		this.copyLocallyToggle = copyRow.createEl('input', { type: 'checkbox' });
-		this.copyLocallyToggle.checked = this.plugin.settings.defaultCopyLocally;
-
-		// Description setting
-		const descRow = content.createDiv('cross-vault-modal-row');
-		descRow.createEl('label', { text: 'Description:' });
-		this.descriptionInput = descRow.createEl('input', { type: 'text' });
-
-		// Buttons
-		const buttonRow = content.createDiv('cross-vault-modal-row');
-		const saveBtn = buttonRow.createEl('button', { text: 'Save' });
-		const cancelBtn = buttonRow.createEl('button', { text: 'Cancel' });
-
-		saveBtn.addEventListener('click', () => {
-			this.save();
-		});
-
-		cancelBtn.addEventListener('click', () => {
-			this.close();
-		});
-	}
-
-	protected async save() {
-		const path = this.pathInput.value.trim();
-		if (!path) {
-			new Notice('Please enter a vault path');
-			return;
+	open() {
+		// Simple prompt for now - in a real implementation, you'd create a proper modal
+		const vaultPath = prompt(`Enter the path for vault "${this.parsedUrl.vault}":`);
+		if (vaultPath) {
+			const mapping: VaultMapping = {
+				name: this.parsedUrl.vault,
+				path: vaultPath,
+				enableLocalCache: false
+			};
+			this.plugin.addVaultMapping(mapping);
+			new Notice(`Vault "${this.parsedUrl.vault}" mapped successfully`);
 		}
-
-		const mapping: VaultMapping = {
-			name: this.vaultName,
-			path: path,
-			copyLocally: this.copyLocallyToggle.checked,
-			description: this.descriptionInput.value.trim()
-		};
-
-		// Update or add mapping
-		const existingIndex = this.plugin.settings.vaultMappings.findIndex(m => m.name === this.vaultName);
-		if (existingIndex >= 0) {
-			this.plugin.settings.vaultMappings[existingIndex] = mapping;
-		} else {
-			this.plugin.settings.vaultMappings.push(mapping);
-		}
-
-		await this.plugin.saveSettings();
-		new Notice(`Vault "${this.vaultName}" mapped successfully`);
-		this.close();
-	}
-
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
 	}
 }
 
@@ -473,126 +324,86 @@ class CrossVaultSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+		containerEl.className = 'cross-vault-settings';
 
-		containerEl.createEl('h2', { text: 'Cross Vault Settings' });
+		containerEl.createEl('h2', { text: 'Cross Vault Navigator Settings' });
 
-		// Default copy locally setting
-		new Setting(containerEl)
-			.setName('Default Copy Locally')
-			.setDesc('Default setting for copying files locally when mapping new vaults')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.defaultCopyLocally)
-				.onChange(async (value) => {
-					this.plugin.settings.defaultCopyLocally = value;
-					await this.plugin.saveSettings();
-				}));
-
-		// Vault mappings section
 		containerEl.createEl('h3', { text: 'Vault Mappings' });
-		containerEl.createEl('p', { 
-			text: 'Configure mappings between vault names in obsidian:// URLs and their local paths.'
-		});
-
+		
 		const mappingsContainer = containerEl.createDiv();
 		this.displayVaultMappings(mappingsContainer);
 
-		// Add new mapping button
 		new Setting(containerEl)
-			.addButton(button => button
-				.setButtonText('Add New Vault Mapping')
-				.setCta()
-				.onClick(() => {
-					new VaultMappingModal(this.app, this.plugin, '').open();
-					// Refresh display after modal closes
-					setTimeout(() => this.display(), 100);
-				}));
+			.setName('Add New Vault')
+			.setDesc('Map a new vault for cross-vault linking')
+			.addButton(button => {
+				button.setButtonText('Add Vault')
+					.setClass('add-vault-button')
+					.onClick(() => {
+						this.showAddVaultDialog();
+					});
+			});
 	}
 
 	private displayVaultMappings(container: HTMLElement) {
 		container.empty();
-
-		if (this.plugin.settings.vaultMappings.length === 0) {
-			container.createEl('p', { 
-				text: 'No vault mappings configured. Add a mapping using the button below or by right-clicking on an obsidian:// link.',
-				cls: 'setting-item-description'
-			});
-			return;
-		}
-
+		
 		this.plugin.settings.vaultMappings.forEach((mapping, index) => {
-			const item = container.createDiv('cross-vault-settings-vault-item');
-
-			const nameEl = item.createDiv('cross-vault-settings-vault-name');
-			nameEl.textContent = mapping.name;
-
-			const pathEl = item.createDiv('cross-vault-settings-vault-path');
-			pathEl.textContent = mapping.path;
-			if (mapping.description) {
-				pathEl.title = mapping.description;
-			}
-
-			const buttonsEl = item.createDiv('cross-vault-settings-buttons');
-
-			// Copy locally indicator
-			if (mapping.copyLocally) {
-				const copyIndicator = buttonsEl.createEl('span', { 
-					text: '📁', 
-					title: 'Copies files locally'
-				});
-			}
-
-			// Edit button
-			const editBtn = buttonsEl.createEl('button', { text: 'Edit' });
-			editBtn.addEventListener('click', () => {
-				new EditVaultMappingModal(this.app, this.plugin, mapping, index).open();
-				setTimeout(() => this.display(), 100);
+			const mappingDiv = container.createDiv({ cls: 'vault-mapping' });
+			
+			const nameInput = mappingDiv.createEl('input', { type: 'text', value: mapping.name });
+			nameInput.placeholder = 'Vault Name';
+			nameInput.addEventListener('blur', () => {
+				mapping.name = nameInput.value;
+				this.plugin.saveSettings();
 			});
-
-			// Delete button
-			const deleteBtn = buttonsEl.createEl('button', { text: 'Delete' });
-			deleteBtn.style.color = 'var(--text-error)';
-			deleteBtn.addEventListener('click', async () => {
-				this.plugin.settings.vaultMappings.splice(index, 1);
-				await this.plugin.saveSettings();
-				this.display();
-				new Notice(`Vault mapping "${mapping.name}" deleted`);
+			
+			const pathInput = mappingDiv.createEl('input', { type: 'text', value: mapping.path });
+			pathInput.placeholder = 'Vault Path';
+			pathInput.addEventListener('blur', () => {
+				mapping.path = pathInput.value;
+				this.plugin.saveSettings();
+			});
+			
+			const browseButton = mappingDiv.createEl('button', { text: 'Browse', cls: 'browse-button' });
+			browseButton.addEventListener('click', () => {
+				// Note: File browsing would require additional implementation
+				new Notice('File browsing not implemented in this demo. Please enter path manually.');
+			});
+			
+			const cacheCheckbox = mappingDiv.createEl('input', { type: 'checkbox' });
+			cacheCheckbox.checked = mapping.enableLocalCache;
+			cacheCheckbox.addEventListener('change', () => {
+				mapping.enableLocalCache = cacheCheckbox.checked;
+				this.plugin.saveSettings();
+			});
+			
+			const cacheLabel = mappingDiv.createEl('label', { text: 'Enable Local Cache' });
+			cacheLabel.prepend(cacheCheckbox);
+			
+			const deleteButton = mappingDiv.createEl('button', { text: 'Delete' });
+			deleteButton.addEventListener('click', () => {
+				this.plugin.removeVaultMapping(mapping.name);
+				this.display(); // Refresh the display
 			});
 		});
 	}
-}
 
-class EditVaultMappingModal extends VaultMappingModal {
-	mapping: VaultMapping;
-	index: number;
-
-	constructor(app: App, plugin: CrossVaultPlugin, mapping: VaultMapping, index: number) {
-		super(app, plugin, mapping.name);
-		this.mapping = mapping;
-		this.index = index;
-	}
-
-	onOpen() {
-		super.onOpen();
+	private showAddVaultDialog() {
+		const name = prompt('Enter vault name:');
+		if (!name) return;
 		
-		// Pre-fill with existing values
-		this.pathInput.value = this.mapping.path;
-		this.copyLocallyToggle.checked = this.mapping.copyLocally;
-		this.descriptionInput.value = this.mapping.description || '';
-	}
-
-	protected async save() {
-		const path = this.pathInput.value.trim();
-		if (!path) {
-			new Notice('Please enter a vault path');
-			return;
-		}
-
-		this.mapping.path = path;
-		this.mapping.copyLocally = this.copyLocallyToggle.checked;
-		this.mapping.description = this.descriptionInput.value.trim();
-
-		await this.plugin.saveSettings();
-		new Notice(`Vault "${this.mapping.name}" updated successfully`);
-		this.close();
+		const path = prompt('Enter vault path:');
+		if (!path) return;
+		
+		const mapping: VaultMapping = {
+			name,
+			path,
+			enableLocalCache: false
+		};
+		
+		this.plugin.addVaultMapping(mapping);
+		this.display(); // Refresh the display
+		new Notice(`Vault "${name}" added successfully`);
 	}
 } 
