@@ -198,18 +198,16 @@ export default class CrossVaultPlugin extends Plugin {
 		if (vaultMapping.enableLocalCache) {
 			// Save to local cache and open
 			await this.cacheFileLocally(vaultMapping.name, fileName, content);
-		}
-		
-		// Try to open the original vault file
-		try {
-			const originalPath = path.join(vaultMapping.path, fileName + '.md');
-			if (fs.existsSync(originalPath)) {
-				// Open in system default app or show notice
-				new Notice(`Opening file from ${vaultMapping.name}: ${fileName}`);
-				// Note: Direct file opening depends on system capabilities
+			new Notice(`File cached locally in ${vaultMapping.name}`);
+		} else {
+			// Open in the target vault using Obsidian URI
+			try {
+				const url = `obsidian://open?vault=${encodeURIComponent(vaultMapping.name)}&file=${encodeURIComponent(fileName)}`;
+				window.open(url);
+				new Notice(`Opening file in ${vaultMapping.name} vault`);
+			} catch (error) {
+				new Notice(`Cannot open file: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			}
-		} catch (error) {
-			new Notice(`Cannot open file: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		}
 	}
 
