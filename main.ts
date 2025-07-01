@@ -13,7 +13,6 @@ import {
 	normalizePath
 } from 'obsidian';
 
-import { remote } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -51,7 +50,9 @@ export default class CrossVaultPlugin extends Plugin {
 		// Add context menu for obsidian:// links
 		this.registerEvent(
 			this.app.workspace.on('editor-menu', (menu, editor, view) => {
-				this.addContextMenu(menu, editor, view);
+				if (view instanceof MarkdownView) {
+					this.addContextMenu(menu, editor, view);
+				}
 			})
 		);
 
@@ -398,14 +399,9 @@ class VaultMappingModal extends Modal {
 		const browseBtn = pathRow.createEl('button', { text: 'Browse' });
 		
 		browseBtn.addEventListener('click', async () => {
-			const result = await remote.dialog.showOpenDialog({
-				properties: ['openDirectory'],
-				title: 'Select Vault Directory'
-			});
-			
-			if (!result.canceled && result.filePaths.length > 0) {
-				this.pathInput.value = result.filePaths[0];
-			}
+			// Note: File dialog functionality requires additional setup for desktop apps
+			// For now, users can manually enter the path
+			new Notice('Please manually enter the vault path. Browse functionality requires additional desktop integration.');
 		});
 
 		// Copy locally setting
@@ -433,7 +429,7 @@ class VaultMappingModal extends Modal {
 		});
 	}
 
-	private async save() {
+	protected async save() {
 		const path = this.pathInput.value.trim();
 		if (!path) {
 			new Notice('Please enter a vault path');
