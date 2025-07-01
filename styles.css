@@ -131,4 +131,44 @@
 
 .cross-vault-widget:hover {
     background-color: var(--background-modifier-hover);
+}
+
+.cross-vault-search {
+	width: 100%;
+	padding: 8px;
+	margin-bottom: 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+}
+
+.cross-vault-file-list,
+.cross-vault-vault-list {
+	max-height: 400px;
+	overflow-y: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+}
+
+.cross-vault-file-item,
+.cross-vault-vault-item {
+	padding: 8px;
+	cursor: pointer;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.cross-vault-file-item:last-child,
+.cross-vault-vault-item:last-child {
+	border-bottom: none;
+}
+
+.cross-vault-file-item:hover,
+.cross-vault-vault-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.cross-vault-empty {
+	padding: 16px;
+	text-align: center;
+	color: var(--text-muted);
 } 

@@ -23,6 +23,17 @@ interface ObsidianUrl {
 	originalUrl: string;
 }
 
+interface VaultFile {
+	vault: VaultMapping;
+	path: string;
+	basename: string;
+}
+
+interface FileSelectionModalProps {
+	vaultMapping: VaultMapping;
+	onSelect: (file: VaultFile) => void;
+}
+
 export default class CrossVaultPlugin extends Plugin {
 	settings!: CrossVaultSettings;
 
@@ -31,6 +42,19 @@ export default class CrossVaultPlugin extends Plugin {
 
 		// Add settings tab
 		this.addSettingTab(new CrossVaultSettingTab(this.app, this));
+
+		// Add command to insert cross-vault link
+		this.addCommand({
+			id: 'insert-cross-vault-link',
+			name: 'Insert Link from Another Vault',
+			editorCallback: async (editor: Editor) => {
+				const vaultFile = await this.selectVaultFile();
+				if (vaultFile) {
+					const linkText = `[${vaultFile.basename}](obsidian://open?vault=${encodeURIComponent(vaultFile.vault.name)}&file=${encodeURIComponent(vaultFile.path)})`;
+					editor.replaceSelection(linkText);
+				}
+			}
+		});
 
 		// Register context menu for obsidian:// links
 		this.registerEvent(
@@ -363,6 +387,17 @@ export default class CrossVaultPlugin extends Plugin {
 	removeVaultMapping(name: string) {
 		this.settings.vaultMappings = this.settings.vaultMappings.filter(m => m.name !== name);
 		this.saveSettings();
+	}
+
+	async selectVaultFile(): Promise<VaultFile | null> {
+		return new Promise((resolve) => {
+			new VaultSelectionModal(this.app, this, (vault) => {
+				new FileSelectionModal(this.app, {
+					vaultMapping: vault,
+					onSelect: (file) => resolve(file)
+				}).open();
+			}).open();
+		});
 	}
 }
 
@@ -737,5 +772,148 @@ class CrossVaultSettingTab extends PluginSettingTab {
 			this.display(); // Refresh the display after adding vault
 		});
 		modal.open();
+	}
+}
+
+class FileSelectionModal extends Modal {
+	private files: VaultFile[] = [];
+	private searchInput!: HTMLInputElement;
+	private fileList!: HTMLElement;
+	private props: FileSelectionModalProps;
+
+	constructor(app: App, props: FileSelectionModalProps) {
+		super(app);
+		this.props = props;
+	}
+
+	async onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		// Add title
+		contentEl.createEl('h2', { text: `Select a file from ${this.props.vaultMapping.name}` });
+
+		// Add search input
+		this.searchInput = contentEl.createEl('input', {
+			type: 'text',
+			placeholder: 'Search files...',
+			cls: 'cross-vault-search'
+		});
+
+		// Add file list container
+		this.fileList = contentEl.createEl('div', { cls: 'cross-vault-file-list' });
+
+		// Load and display files
+		await this.loadFiles();
+
+		// Setup search handler
+		this.searchInput.addEventListener('input', () => {
+			this.updateFileList();
+		});
+	}
+
+	private async loadFiles() {
+		try {
+			const files = await this.getAllMarkdownFiles(this.props.vaultMapping.path);
+			this.files = files.map(filePath => ({
+				vault: this.props.vaultMapping,
+				path: path.relative(this.props.vaultMapping.path, filePath).replace(/\\/g, '/').replace(/\.md$/, ''),
+				basename: path.basename(filePath, '.md')
+			}));
+			this.updateFileList();
+		} catch (error) {
+			new Notice(`Error loading files: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		}
+	}
+
+	private async getAllMarkdownFiles(dirPath: string): Promise<string[]> {
+		const files: string[] = [];
+		const items = fs.readdirSync(dirPath);
+
+		for (const item of items) {
+			const fullPath = path.join(dirPath, item);
+			const stats = fs.statSync(fullPath);
+
+			if (stats.isDirectory()) {
+				files.push(...await this.getAllMarkdownFiles(fullPath));
+			} else if (item.endsWith('.md')) {
+				files.push(fullPath);
+			}
+		}
+
+		return files;
+	}
+
+	private updateFileList() {
+		const searchTerm = this.searchInput.value.toLowerCase();
+		this.fileList.empty();
+
+		const filteredFiles = searchTerm
+			? this.files.filter(file => 
+				file.basename.toLowerCase().includes(searchTerm) ||
+				file.path.toLowerCase().includes(searchTerm))
+			: this.files;
+
+		filteredFiles.forEach(file => {
+			const item = this.fileList.createEl('div', { 
+				cls: 'cross-vault-file-item',
+				text: file.path
+			});
+
+			item.addEventListener('click', () => {
+				this.props.onSelect(file);
+				this.close();
+			});
+		});
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
+class VaultSelectionModal extends Modal {
+	private vaultList!: HTMLElement;
+	private callback: (vault: VaultMapping) => void;
+	private plugin: CrossVaultPlugin;
+
+	constructor(app: App, plugin: CrossVaultPlugin, callback: (vault: VaultMapping) => void) {
+		super(app);
+		this.plugin = plugin;
+		this.callback = callback;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		contentEl.createEl('h2', { text: 'Select a Vault' });
+
+		this.vaultList = contentEl.createEl('div', { cls: 'cross-vault-vault-list' });
+
+		this.plugin.settings.vaultMappings.forEach(vault => {
+			const item = this.vaultList.createEl('div', {
+				cls: 'cross-vault-vault-item',
+				text: vault.name
+			});
+
+			item.addEventListener('click', () => {
+				this.callback(vault);
+				this.close();
+			});
+		});
+
+		if (this.plugin.settings.vaultMappings.length === 0) {
+			this.vaultList.createEl('div', {
+				cls: 'cross-vault-empty',
+				text: 'No vaults configured. Please add vaults in the plugin settings.'
+			});
+		}
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
 	}
 } 
