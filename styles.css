@@ -35,21 +35,23 @@
 .cross-vault-preview {
     border: 1px solid var(--background-modifier-border);
     border-radius: 5px;
-    padding: 10px;
+    padding: 12px;
     margin: 5px 0;
-    background-color: var(--background-secondary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    background-color: var(--background-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     max-width: 400px;
     font-size: 0.9em;
     z-index: 1000;
+    position: absolute;
 }
 
 .cross-vault-preview strong {
     color: var(--text-accent);
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
     border-bottom: 1px solid var(--background-modifier-border);
-    padding-bottom: 5px;
+    padding-bottom: 8px;
+    font-size: 1.1em;
 }
 
 .cross-vault-link {

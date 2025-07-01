@@ -158,7 +158,7 @@ export default class CrossVaultPlugin extends Plugin {
 		linkElement.appendChild(statusSpan);
 	}
 
-	private showPreview(element: HTMLElement, content: string, fileName: string) {
+	showPreview(element: HTMLElement, content: string, fileName: string) {
 		const preview = document.createElement('div');
 		preview.className = 'cross-vault-preview';
 
@@ -194,7 +194,7 @@ export default class CrossVaultPlugin extends Plugin {
 		setTimeout(removePreview, 5000); // Auto-remove after 5 seconds
 	}
 
-	private async openCrossVaultFile(vaultMapping: VaultMapping, fileName: string, content: string) {
+	async openCrossVaultFile(vaultMapping: VaultMapping, fileName: string, content: string) {
 		if (vaultMapping.enableLocalCache) {
 			// Save to local cache and open
 			await this.cacheFileLocally(vaultMapping.name, fileName, content);
@@ -233,7 +233,7 @@ export default class CrossVaultPlugin extends Plugin {
 		}
 	}
 
-	private async getFileFromVault(vaultMapping: VaultMapping, fileName: string): Promise<string | null> {
+	async getFileFromVault(vaultMapping: VaultMapping, fileName: string): Promise<string | null> {
 		try {
 			const filePath = path.join(vaultMapping.path, fileName + '.md');
 			
@@ -290,7 +290,7 @@ export default class CrossVaultPlugin extends Plugin {
 		return this.settings.vaultMappings.find(mapping => mapping.name === vaultName) || null;
 	}
 
-	private async showVaultMappingDialog(parsedUrl: ObsidianUrl) {
+	async showVaultMappingDialog(parsedUrl: ObsidianUrl) {
 		const modal = new VaultMappingModal(this.app, this, parsedUrl);
 		modal.open();
 	}
@@ -328,7 +328,7 @@ export default class CrossVaultPlugin extends Plugin {
 					// Add the link styling and replace text
 					const displayText = this.plugin.getDisplayText(parsedUrl);
 					widgets.push(Decoration.replace({
-						widget: new CrossVaultDisplayWidget(displayText),
+						widget: new CrossVaultDisplayWidget(displayText, this.plugin, parsedUrl, vaultMapping),
 					}).range(from, to));
 
 					// Add the status widget
@@ -568,7 +568,12 @@ class AddVaultModal extends Modal {
 }
 
 class CrossVaultDisplayWidget extends WidgetType {
-	constructor(private text: string) {
+	constructor(
+		private text: string,
+		private plugin: CrossVaultPlugin,
+		private parsedUrl: ObsidianUrl,
+		private vaultMapping: VaultMapping | null
+	) {
 		super();
 	}
 
@@ -576,6 +581,34 @@ class CrossVaultDisplayWidget extends WidgetType {
 		const span = document.createElement('span');
 		span.className = 'cross-vault-link';
 		span.textContent = this.text;
+
+		if (this.vaultMapping) {
+			span.title = `Click to open in ${this.vaultMapping.name} vault`;
+			
+			// Handle hover
+			span.addEventListener('mouseenter', async () => {
+				const fileContent = await this.plugin.getFileFromVault(this.vaultMapping!, this.parsedUrl.file);
+				if (fileContent) {
+					this.plugin.showPreview(span, fileContent, this.parsedUrl.file);
+				}
+			});
+
+			// Handle click
+			span.addEventListener('click', async (e) => {
+				e.preventDefault();
+				const fileContent = await this.plugin.getFileFromVault(this.vaultMapping!, this.parsedUrl.file);
+				if (fileContent) {
+					this.plugin.openCrossVaultFile(this.vaultMapping!, this.parsedUrl.file, fileContent);
+				}
+			});
+		} else {
+			span.title = `Vault "${this.parsedUrl.vault}" not mapped. Click to map.`;
+			span.addEventListener('click', (e) => {
+				e.preventDefault();
+				this.plugin.showVaultMappingDialog(this.parsedUrl);
+			});
+		}
+
 		return span;
 	}
 }
